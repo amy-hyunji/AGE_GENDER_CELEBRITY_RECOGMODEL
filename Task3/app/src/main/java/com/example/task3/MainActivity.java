@@ -3,18 +3,31 @@ package com.example.task3;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Matrix;
+import android.net.Uri;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.provider.MediaStore.Audio.Media;
+import android.renderscript.ScriptGroup;
 import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.FileProvider;
+
 import android.os.Bundle;
+import android.widget.Toast;
+
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.gson.Gson;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,46 +41,75 @@ import retrofit2.Callback;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
 import com.example.task3.Response;
+import com.github.chrisbanes.photoview.PhotoView;
 
 public class MainActivity extends AppCompatActivity implements OnClickListener {
-    
+
+
     public static final String URL = "http://143.248.36.213:3355/";
     
     private static final int INTENT_REQUEST_ALBUM = 100;
+    private static final int INTENT_REQUEST_CAMERA = 50;
     
-    private Button button;
-    private ImageView imageView;
+    private PhotoView photoView;
     private TextView textView;
     private String imageString;
-    
+    private Animation fab_open, fab_close;
+    private Boolean isFabOpen = false;
+    private FloatingActionButton fab, fab1, fab2, fab3, fab4;
+    String currentPhotoPath;
+    Bitmap bitmap;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        fab_open = AnimationUtils.loadAnimation(getApplicationContext(), R.anim.fab_open);
+        fab_close = AnimationUtils.loadAnimation(getApplicationContext(), R.anim.fab_close);
         
-        button = (Button) findViewById(R.id.button);
-        imageView = (ImageView) findViewById(R.id.imageView);
-//        textView = (TextView) findViewById(R.id.textView);
-        
-        button.setOnClickListener(this);
+        fab = (FloatingActionButton) findViewById(R.id.fab);
+        fab1 = (FloatingActionButton) findViewById(R.id.fab1);
+        fab2 = (FloatingActionButton) findViewById(R.id.fab2);
+        fab3 = (FloatingActionButton) findViewById(R.id.fab3);
+        fab4 = (FloatingActionButton) findViewById(R.id.fab4);
+
+        photoView = findViewById(R.id.photoView);
+        photoView.setImageResource(R.drawable.camera);
+
+        fab.setOnClickListener(this);
+        fab1.setOnClickListener(this);
+        fab2.setOnClickListener(this);
+        fab3.setOnClickListener(this);
+        fab4.setOnClickListener(this);
     }
     
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if(requestCode == INTENT_REQUEST_ALBUM && resultCode == RESULT_OK) {
             try {
-                InputStream is = getContentResolver().openInputStream(data.getData());
-                Log.d("onActivityResult", "here");
-                uploadImage(getBytes(is));
+                Uri contentUri = data.getData();
+                bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), contentUri);
+                photoView.setImageBitmap(bitmap);
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
             } catch (IOException e) {
                 e.printStackTrace();
             }
-    
+        }
+        if (requestCode == INTENT_REQUEST_CAMERA && resultCode == RESULT_OK) {
+            try {
+                Log.v("fab1", "intent request");
+                File f = new File(currentPhotoPath);
+                Uri contentUri = Uri.fromFile(f);
+                bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), contentUri);
+                photoView.setImageBitmap(bitmap);
+            }catch(Exception e){
+                e.printStackTrace();
+            }
         }
     }
-    
+
     public byte[] getBytes(InputStream is) throws IOException {
         ByteArrayOutputStream byteBuff = new ByteArrayOutputStream();
         
@@ -103,10 +145,11 @@ public class MainActivity extends AppCompatActivity implements OnClickListener {
                     byte[] decodedString = null;
                     try {
                         decodedString = Base64.decode(imageString, Base64.DEFAULT);
+                        System.out.println(decodedString.length);
                         Bitmap bitmapImage = BitmapFactory.decodeByteArray(decodedString, 0, decodedString.length);
-                        imageView.setImageBitmap(bitmapImage);
+                        photoView.setImageBitmap(bitmapImage);
                     } catch (IllegalArgumentException e) {
-                        imageView.setImageResource(R.drawable.xgiyhona_retry);
+                        photoView.setImageResource(R.drawable.xgiyhona_retry);
                     }
                     
 //                    textView.setText(imageString);
@@ -133,12 +176,101 @@ public class MainActivity extends AppCompatActivity implements OnClickListener {
     
     @Override
     public void onClick(View view) {
-        if(view.getId() == R.id.button) {
-            Log.d("button", "clicked");
+        if(view.getId() == R.id.fab2) {
+            Log.d("fab2", "clicked");
             Intent intent = new Intent(Intent.ACTION_PICK);
             intent.setType("image/");
             startActivityForResult(intent, INTENT_REQUEST_ALBUM);
-            Log.d("button", "skipped");
+            Log.d("fab2", "skipped");
         }
+        if(view.getId() == R.id.fab1) {
+            Log.d("fab1", "clicked");
+            Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+            if (intent.resolveActivity(this.getPackageManager()) != null) {
+                File photoFile = null;
+                try {
+                    photoFile = createImageFile();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                if (photoFile != null) {
+                    Uri providerURI = FileProvider.getUriForFile(this, this.getPackageName(), photoFile);
+//                    try {
+//                        bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), providerURI);
+//                    } catch (IOException e) {
+//                        e.printStackTrace();
+//                    }
+                    intent.putExtra(MediaStore.EXTRA_OUTPUT, providerURI);
+                    startActivityForResult(intent, INTENT_REQUEST_CAMERA);
+                }
+            }
+            Log.d("fab1", "skipped");
+        }
+        if(view.getId() == R.id.fab) {
+            anim();
+        }
+        if(view.getId() == R.id.fab3) {
+            bitmap = rotateImage(bitmap, 90);
+            photoView.setImageBitmap(bitmap);
+        }
+        if(view.getId() == R.id.fab4){
+            anim();
+            uploadImage(bitmapToByteArray(bitmap));
+        }
+    }
+
+    private File createImageFile() throws IOException {
+        String imgFileName = System.currentTimeMillis() + ".jpg";
+        File imageFile;
+        File storageDir = new File(Environment.getExternalStorageDirectory() + "/Pictures", "ireh");
+        if(!storageDir.exists()){
+            storageDir.mkdirs();
+        }
+        imageFile = new File(storageDir,imgFileName);
+        currentPhotoPath = imageFile.getAbsolutePath();
+        return imageFile;
+
+    }
+
+    public void anim() {
+
+        if (isFabOpen) {
+            fab1.startAnimation(fab_close);
+            fab2.startAnimation(fab_close);
+            fab3.startAnimation(fab_close);
+            fab4.startAnimation(fab_close);
+            fab1.setClickable(false);
+            fab2.setClickable(false);
+            fab3.setClickable(false);
+            fab4.setClickable(false);
+            isFabOpen = false;
+        } else {
+            fab1.startAnimation(fab_open);
+            fab2.startAnimation(fab_open);
+            fab3.startAnimation(fab_open);
+            fab4.startAnimation(fab_open);
+            fab1.setClickable(true);
+            fab2.setClickable(true);
+            fab3.setClickable(true);
+            fab4.setClickable(true);
+            isFabOpen = true;
+        }
+    }
+
+    public Bitmap rotateImage(Bitmap src, float degree) {
+
+        // Matrix 객체 생성
+        Matrix matrix = new Matrix();
+        // 회전 각도 셋팅
+        matrix.postRotate(degree);
+        // 이미지와 Matrix 를 셋팅해서 Bitmap 객체 생성
+        return Bitmap.createBitmap(src, 0, 0, src.getWidth(),src.getHeight(), matrix, true);
+    }
+
+    public byte[] bitmapToByteArray(Bitmap $bitmap) {
+        ByteArrayOutputStream stream = new ByteArrayOutputStream();
+        $bitmap.compress(Bitmap.CompressFormat.JPEG, 100, stream);
+        byte[] byteArray = stream.toByteArray();
+        return byteArray;
     }
 }
