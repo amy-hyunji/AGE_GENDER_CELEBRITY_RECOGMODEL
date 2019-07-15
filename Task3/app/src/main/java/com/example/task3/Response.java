@@ -2,11 +2,11 @@ package com.example.task3;
 
 public class Response {
     
-    private String message;
+    private String celebrity;
     private String image;
     
-    public String getMessage() {
-        return message;
+    public String getCelebrity() {
+        return celebrity;
     }
     
     public String getImage() {

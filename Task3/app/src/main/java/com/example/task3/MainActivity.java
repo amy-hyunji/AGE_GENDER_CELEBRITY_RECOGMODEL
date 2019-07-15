@@ -7,22 +7,17 @@ import android.graphics.Matrix;
 import android.net.Uri;
 import android.os.Environment;
 import android.provider.MediaStore;
-import android.provider.MediaStore.Audio.Media;
-import android.renderscript.ScriptGroup;
 import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
-import android.widget.Button;
-import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
 
 import android.os.Bundle;
-import android.widget.Toast;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.gson.Gson;
@@ -31,16 +26,16 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.concurrent.TimeUnit;
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
+import okhttp3.OkHttpClient;
 import okhttp3.RequestBody;
 import okhttp3.ResponseBody;
-import org.w3c.dom.Text;
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
-import com.example.task3.Response;
 import com.github.chrisbanes.photoview.PhotoView;
 
 public class MainActivity extends AppCompatActivity implements OnClickListener {
@@ -53,7 +48,7 @@ public class MainActivity extends AppCompatActivity implements OnClickListener {
     
     private PhotoView photoView;
     private TextView textView;
-    private String imageString;
+    private String imageString, celebrityString;
     private Animation fab_open, fab_close;
     private Boolean isFabOpen = false;
     private FloatingActionButton fab, fab1, fab2, fab3, fab4;
@@ -76,6 +71,7 @@ public class MainActivity extends AppCompatActivity implements OnClickListener {
 
         photoView = findViewById(R.id.photoView);
         photoView.setImageResource(R.drawable.camera);
+        textView = findViewById(R.id.textView);
 
         fab.setOnClickListener(this);
         fab1.setOnClickListener(this);
@@ -126,8 +122,14 @@ public class MainActivity extends AppCompatActivity implements OnClickListener {
     
     private void uploadImage(byte[] imageBytes) {
         Log.d("uploadImage","hi");
+        OkHttpClient okHttpClient = new OkHttpClient.Builder()
+            .connectTimeout(2, TimeUnit.MINUTES)
+            .readTimeout(90, TimeUnit.SECONDS)
+            .writeTimeout(90, TimeUnit.SECONDS)
+            .build();
         Retrofit retrofit = new Retrofit.Builder()
             .baseUrl(URL)
+            .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build();
         
@@ -142,6 +144,9 @@ public class MainActivity extends AppCompatActivity implements OnClickListener {
                 if(response.isSuccessful()) {
                     Response responseBody = response.body();
                     imageString = responseBody.getImage();
+                    celebrityString = responseBody.getCelebrity();
+                    textView.setText(celebrityString);
+                    textView.setVisibility(View.VISIBLE);
                     byte[] decodedString = null;
                     try {
                         decodedString = Base64.decode(imageString, Base64.DEFAULT);
@@ -158,6 +163,8 @@ public class MainActivity extends AppCompatActivity implements OnClickListener {
                     ResponseBody errorBody = response.errorBody();
                     
                     Gson gson= new Gson();
+                    
+                    Log.d("uploadImage", "ERROR response");
     
                     try {
                         Response errorResponse = gson.fromJson(errorBody.string(), Response.class);
@@ -169,7 +176,8 @@ public class MainActivity extends AppCompatActivity implements OnClickListener {
     
             @Override
             public void onFailure(Call<Response> call, Throwable t) {
-        
+                Log.d("uploadImage", "FAILED");
+                t.printStackTrace();
             }
         });
     }
@@ -195,11 +203,6 @@ public class MainActivity extends AppCompatActivity implements OnClickListener {
                 }
                 if (photoFile != null) {
                     Uri providerURI = FileProvider.getUriForFile(this, this.getPackageName(), photoFile);
-//                    try {
-//                        bitmap = MediaStore.Images.Media.getBitmap(this.getContentResolver(), providerURI);
-//                    } catch (IOException e) {
-//                        e.printStackTrace();
-//                    }
                     intent.putExtra(MediaStore.EXTRA_OUTPUT, providerURI);
                     startActivityForResult(intent, INTENT_REQUEST_CAMERA);
                 }
@@ -216,6 +219,7 @@ public class MainActivity extends AppCompatActivity implements OnClickListener {
         if(view.getId() == R.id.fab4){
             anim();
             uploadImage(bitmapToByteArray(bitmap));
+            textView.setVisibility(View.INVISIBLE);
         }
     }
 
